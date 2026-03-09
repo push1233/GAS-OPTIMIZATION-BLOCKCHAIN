@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gas Fee Optimizer - Batch Demo</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.11.1/ethers.umd.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0d1117; color: #c9d1d9; max-width: 900px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .card { background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        h1, h2, h3 { color: #58a6ff; margin-top: 0; }
+        input { width: 100%; padding: 10px; margin: 10px 0; background: #010409; border: 1px solid #30363d; color: white; border-radius: 5px; box-sizing: border-box; }
+        button { background-color: #238636; color: white; border: none; padding: 12px 20px; cursor: pointer; border-radius: 5px; font-weight: bold; width: 100%; margin-top: 10px; transition: 0.2s;}
+        button:hover { background-color: #2ea043; }
+        .relayer-btn { background-color: #a371f7; }
+        .relayer-btn:hover { background-color: #bc8cff; }
+        .danger-btn { background-color: #da3633; margin-top: 5px; }
+        .danger-btn:hover { background-color: #f85149; }
+        .queue-item { background: #010409; border-left: 4px solid #7ee787; padding: 10px; margin-bottom: 10px; font-family: monospace; font-size: 0.85em; word-break: break-all; }
+        .status { margin-top: 10px; font-size: 0.9em; color: #8b949e; }
+        hr { border: 0; border-top: 1px solid #30363d; margin: 20px 0; }
+    </style>
+</head>
+<body>
+
+    <h1>Gas Fee Optimizer: Batch Demo</h1>
+    <p>This dashboard demonstrates Meta-Transactions and Transaction Batching. Collect multiple gasless signatures, then execute them in one transaction to optimize network fees.</p>
+    
+    <div class="card">
+        <h2>1. System Setup</h2>
+        <button id="connectBtn" onclick="connectWallet()">Connect MetaMask</button>
+        <p class="status" id="walletStatus">Wallet not connected</p>
+        
+        <label>Deployed GasRelayer Contract Address (Sepolia):</label>
+        <input type="text" id="contractAddress" placeholder="Paste your deployed address here">
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <h2>2. User View (Off-Chain)</h2>
+            <p style="font-size: 0.85em; color: #8b949e;"><i>Switch MetaMask to your "User" accounts before signing. Users pay NO gas.</i></p>
+            <hr>
+            
+            <label>Recipient Address:</label>
+            <input type="text" id="recipientAddress" placeholder="e.g., 0x1111...">
+            
+            <label>Amount (in ETH):</label>
+            <input type="text" id="ethAmount" value="0.001">
+            
+            <button onclick="signAndAddToBatch()">Sign & Add to Batch</button>
+            <p class="status" id="signStatus"></p>
+        </div>
+
+        <div class="card" style="border-color: #a371f7;">
+            <h2 style="color: #a371f7;">3. Relayer View (On-Chain)</h2>
+            <p style="font-size: 0.85em; color: #8b949e;"><i>Switch MetaMask back to Relayer Account. The Relayer pays a single gas fee to process the entire batch.</i></p>
+            <hr>
+
+            <h3>Pending Batch Queue: <span id="queueCount">0</span></h3>
+            <div id="batchQueueContainer">
+                <p style="color: #8b949e; font-size: 0.85em;">Queue is empty. Generate signatures to build the batch.</p>
+            </div>
+            
+            <button class="relayer-btn" onclick="executeBatch()">Execute Batched Transaction</button>
+            <button class="danger-btn" onclick="clearBatch()">🗑️ Clear Queue</button>
+            <p class="status" id="relayStatus"></p>
+        </div>
+    </div>
+
+    <script>
+        let provider, signer, currentAddress;
+        let batchQueue = [];
+
+        const contractABI = [
+            "function nonces(address owner) view returns (uint256)",
+            "function balances(address owner) view returns (uint256)",
+            "function executeBatch(address[] calldata users, address[] calldata recipients, uint256[] calldata amounts, bytes[] calldata signatures) external",
+            "event TransferSuccess(address indexed user, address indexed recipient, uint256 amount)",
+            "event TransferFailed(address indexed user, address indexed recipient, uint256 amount, string reason)"
+        ];
+
+        async function connectWallet() {
+            if (window.ethereum) {
+                try {
+                    await window.ethereum.request({
+                        method: 'wallet_switchEthereumChain',
+                        params: [{ chainId: '0xaa36a7' }], 
+                    });
+                } catch (error) {
+                    alert("Please allow MetaMask to switch to the Sepolia network!");
+                    return;
+                }
+
+                provider = new ethers.BrowserProvider(window.ethereum);
+                signer = await provider.getSigner();
+                currentAddress = await signer.getAddress();
+                
+                window.ethereum.on('accountsChanged', handleAccountsChanged);
+                window.ethereum.on('chainChanged', () => window.location.reload());
+                
+                updateWalletStatus();
+            } else {
+                alert("Please install MetaMask!");
+            }
+        }
+
+        async function handleAccountsChanged(accounts) {
+            if (accounts.length > 0) {
+                signer = await provider.getSigner();
+                currentAddress = await signer.getAddress();
+                updateWalletStatus();
+            }
+        }
+
+        function updateWalletStatus() {
+            document.getElementById('walletStatus').innerHTML = `<b>Active Account:</b> ${currentAddress}`;
+        }
+
+        async function signAndAddToBatch() {
+            try {
+                const contractAddr = document.getElementById('contractAddress').value;
+                const recipient = document.getElementById('recipientAddress').value;
+                const amountStr = document.getElementById('ethAmount').value;
+                
+                if (!contractAddr || !recipient || !amountStr) return alert("Fill all fields!");
+
+                document.getElementById('signStatus').innerText = "Checking network...";
+                
+                signer = await provider.getSigner();
+                currentAddress = await signer.getAddress();
+
+                const network = await provider.getNetwork();
+                if (network.chainId !== 11155111n) {
+                    alert("❌ Wrong Network! Open MetaMask and switch to the Sepolia Testnet.");
+                    document.getElementById('signStatus').innerText = "Error: Wrong network.";
+                    return;
+                }
+
+                const contract = new ethers.Contract(contractAddr, contractABI, provider);
+                const currentNonce = await contract.nonces(currentAddress);
+
+                const domain = {
+                    name: "GasRelayerSystem",
+                    version: "1",
+                    chainId: 11155111,
+                    verifyingContract: contractAddr
+                };
+
+                const types = {
+                    MetaTransaction: [
+                        { name: "user", type: "address" },
+                        { name: "recipient", type: "address" },
+                        { name: "amount", type: "uint256" },
+                        { name: "nonce", type: "uint256" }
+                    ]
+                };
+
+                const amountInWei = ethers.parseEther(amountStr);
+                const value = { user: currentAddress, recipient: recipient, amount: amountInWei, nonce: currentNonce };
+
+                document.getElementById('signStatus').innerText = "Please sign the message in MetaMask...";
+                const signature = await signer.signTypedData(domain, types, value);
+
+                batchQueue.push({
+                    user: currentAddress,
+                    recipient: recipient,
+                    amount: amountInWei, 
+                    signature: signature
+                });
+
+                document.getElementById('signStatus').innerText = "✅ Added to batch!";
+                renderQueue();
+
+            } catch (error) {
+                console.error(error);
+                document.getElementById('signStatus').innerText = "Error: " + error.message;
+            }
+        }
+
+        function renderQueue() {
+            document.getElementById('queueCount').innerText = batchQueue.length;
+            const container = document.getElementById('batchQueueContainer');
+            
+            if (batchQueue.length === 0) {
+                container.innerHTML = '<p style="color: #8b949e; font-size: 0.85em;">Queue is empty. Generate signatures to build the batch.</p>';
+                return;
+            }
+
+            container.innerHTML = ''; 
+            
+            batchQueue.forEach((intent, index) => {
+                const item = document.createElement('div');
+                item.className = 'queue-item';
+                item.innerHTML = `
+                    <b>Tx ${index + 1}</b><br>
+                    From: ${intent.user.substring(0,6)}...${intent.user.substring(38)}<br>
+                    To: ${intent.recipient.substring(0,6)}...${intent.recipient.substring(38)}<br>
+                    Amount: ${ethers.formatEther(intent.amount)} ETH
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function clearBatch() {
+            batchQueue = [];
+            renderQueue();
+            document.getElementById('signStatus').innerText = "";
+            document.getElementById('relayStatus').innerText = "";
+        }
+
+        async function executeBatch() {
+            if (batchQueue.length === 0) return alert("Queue is empty!");
+
+            const contractAddr = document.getElementById('contractAddress').value;
+            if (!contractAddr) return alert("Please enter the contract address first!");
+
+            
+            signer = await provider.getSigner();
+            const contract = new ethers.Contract(contractAddr, contractABI, signer);
+            
+            const validTransactions = [];
+            const failedUsers = [];
+
+            document.getElementById('relayStatus').innerText = "🔍 Performing off-chain balance checks...";
+
+            for (const tx of batchQueue) {
+                
+                const internalBalance = await contract.balances(tx.user);
+
+                
+                if (internalBalance >= tx.amount) {
+                    validTransactions.push(tx);
+                } else {
+                    failedUsers.push({
+                        address: tx.user,
+                        balance: ethers.formatEther(internalBalance),
+                        required: ethers.formatEther(tx.amount)
+                    });
+                }
+            }
+
+            
+            if (failedUsers.length > 0) {
+                let errorMsg = "⚠️ The following users have insufficient internal balances and were removed from the batch:\n";
+                failedUsers.forEach(f => {
+                    errorMsg += `- ${f.address.slice(0,6)}...: Has ${f.balance} ETH, needs ${f.required} ETH\n`;
+                });
+                alert(errorMsg);
+            }
+
+            
+            if (validTransactions.length === 0) {
+                document.getElementById('relayStatus').innerText = "❌ No valid transactions to execute.";
+                return;
+            }
+
+            
+            try {
+                document.getElementById('relayStatus').innerText = "Formatting arrays and sending to Sepolia...";
+                
+                const users = validTransactions.map(t => t.user);
+                const recipients = validTransactions.map(t => t.recipient);
+                const amounts = validTransactions.map(t => t.amount);
+                const signatures = validTransactions.map(t => t.signature);
+
+                const txResponse = await contract.executeBatch(users, recipients, amounts, signatures);
+                document.getElementById('relayStatus').innerText = `Transaction sent! Hash: ${txResponse.hash}. Waiting for confirmation...`;
+                
+                await txResponse.wait();
+                
+                document.getElementById('relayStatus').innerText = "✅ Batch executed successfully (invalid transactions were skipped)!";
+                alert("✅ Batch execution confirmed on the blockchain!");
+                
+                
+                batchQueue = []; 
+                renderQueue();
+            } catch (error) {
+                console.error("Batch execution failed:", error);
+                document.getElementById('relayStatus').innerText = "Error: " + (error.reason || error.message);
+            }
+        }
+    </script>
+</body>
+</html>
