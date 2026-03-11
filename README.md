@@ -1,17 +1,17 @@
 <div align="center">
-  <h1>⛽ Gas Fee Optimizer</h1>
+  <h1>Gas Fee Optimizer</h1>
   <p><b>Zero-Gas Meta-Transactions & Batched Relayer Architecture</b></p>
   
-  [![Live Demo](https://img.shields.io/badge/Live_Demo-gas--optimization--blockchain.vercel.app-blue?style=for-the-badge)](https://gas-optimization-blockchain.vercel.app)
+  [![Live Demo](https://img.shields.io/badge/Live_Demo-gas--optimization--blockchain.vercel.app-blue?style=for-the-badge)](https://gas-optimization-blockchain.vercel.app/batch-demo.html)
   [![Network](https://img.shields.io/badge/Network-Sepolia_Testnet-lightgrey?style=for-the-badge)]()
 </div>
 
 <br>
 
-## 🚀 Introduction
+## Introduction
 Network congestion and the flat 21,000 EVM base gas limit create massive friction for decentralized applications. This project bypasses this barrier by decoupling the transaction *signer* from the *broadcaster*. Secondary users can interact with the smart contract without holding any native ETH, while a central Relayer optimizes network fees through batch execution.
 
-## 🛠 Tech Stack
+## Tech Stack
 * **Smart Contracts:** Solidity `^0.8.19`, OpenZeppelin (`EIP712`, `ECDSA`)
 * **Frontend:** HTML5, Vanilla JavaScript, CSS
 * **Web3 Connectivity:** Ethers.js, MetaMask
@@ -19,7 +19,7 @@ Network congestion and the flat 21,000 EVM base gas limit create massive frictio
 
 ---
 
-## 🧠 What I Did & Why
+## What I Did & Why
 
 **1. Implemented EIP-712 Meta-Transactions (Off-Chain Cryptography)**
 * **What:** Users sign a structured data payload (`MetaTransaction`) containing the recipient, amount, and nonce, rather than submitting a standard transaction.
@@ -35,7 +35,7 @@ Network congestion and the flat 21,000 EVM base gas limit create massive frictio
 
 ---
 
-## 🏗 System Architecture
+## System Architecture
 
 
 ```text
