@@ -2,7 +2,7 @@
   <h1>Gas Fee Optimizer</h1>
   <p><b>Zero-Gas Meta-Transactions & Batched Relayer Architecture</b></p>
   
-  [![Live Demo](https://img.shields.io/badge/Live_Demo-gas--optimization--blockchain.vercel.app-blue?style=for-the-badge)](https://gas-optimization-blockchain.vercel.app/batch-demo.html)
+  [![Live Demo](https://img.shields.io/badge/Live_Demo-gas--optimization--blockchain.vercel.app/batch-demo.html-blue?style=for-the-badge)](https://gas-optimization-blockchain.vercel.app/batch-demo.html)
   [![Network](https://img.shields.io/badge/Network-Sepolia_Testnet-lightgrey?style=for-the-badge)]()
 </div>
 
