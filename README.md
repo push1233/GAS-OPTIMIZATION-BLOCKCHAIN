@@ -61,5 +61,5 @@ GAS-OPTIMIZATION-BLOCKCHAIN
 │
 ├── frontend/
 │   └── batch-demo.html            # The unified HTML/JS Relayer dashboard
-│── Kriti Report.pdf
+│── GAS-OPTIMIZATION.pdf
 └── README.md                      # Architecture documentation
