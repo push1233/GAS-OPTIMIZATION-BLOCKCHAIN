@@ -2,7 +2,7 @@
   <h1>Gas Fee Optimizer</h1>
   <p><b>Zero-Gas Meta-Transactions & Batched Relayer Architecture</b></p>
   
-  [![Live Demo](https://img.shields.io/badge/Live_Demo-gas--optimization--blockchain.vercel.app/batch-demo.html-blue?style=for-the-badge)](https://gas-optimization-blockchain.vercel.app/batch-demo.html)
+  [![Live Demo](https://img.shields.io/badge/Live_Demo-gas--optimization--blockchain.vercel.app-blue?style=for-the-badge)](https://gas-optimization-blockchain.vercel.app/batch-demo.html)
   [![Network](https://img.shields.io/badge/Network-Sepolia_Testnet-lightgrey?style=for-the-badge)]()
 </div>
 
@@ -33,6 +33,14 @@ Network congestion and the flat 21,000 EVM base gas limit create massive frictio
 * **What:** The JavaScript frontend verifies user balances before allowing the Relayer to submit the batch.
 * **Why:** Prevents the Relayer from wasting gas on transactions mathematically guaranteed to fail on-chain.
 
+## Core Security Defenses
+* **Replay Attack Mitigation**: Strict nonces[user]++ tracking post-execution.
+
+* **Cross-Chain Replay Defense**: EIP-712 Domain Separator bound strictly to chainId: 11155111 (Sepolia).
+
+* **Reentrancy Protection**: Strictly utilizing the Checks-Effects-Interactions pattern during external ETH transfers.
+
+* **Batch DoS Prevention**: Graceful if (success) failure handling prevents a single reverting transfer from crashing the entire relayed array.
 ---
 
 ## System Architecture
